@@ -112,6 +112,8 @@ export default class App extends Component<Props> {
     } else { // set user to active
       socket && socket.emit('active', {
         uuid: this.state.uuid,
+        long: this.state.long,
+        lat: this.state.lat,
       });
     }
 
@@ -123,6 +125,13 @@ export default class App extends Component<Props> {
     socket.on('update', (arr) => {
       const llamas = arr;
       this.setState({ llamas });
+    })
+    socket.on('new_room', () => {
+      socket.emit('active', {
+        uuid: this.state.uuid,
+        long: this.state.long,
+        lat: this.state.lat,
+      });
     })
     this.setState({ socket });
   }
