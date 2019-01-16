@@ -19,6 +19,7 @@ export default class App extends Component<Props> {
       long: null,
       lat: null,
       name: null,
+      error: null,
       // sample llama (person in trouble) object
       // {
       //   uuid: 'fu3wfb-g34igub-v3rivf',
@@ -33,6 +34,20 @@ export default class App extends Component<Props> {
   componentWillMount() {
     this.retrieveUuid();
     this.retrieveSwitchValue();
+    this.setCurrentGeolocation();
+  }
+
+  setCurrentGeolocation = () => {
+    navigator.geolocation.getCurrentPosition((position) => {
+      this.setState({
+        lat: position.coords.latitude,
+        long: position.coords.longitude,
+        error: null,
+        });
+      },
+      (error) => this.setState({ error: error.message }),
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 },
+    );
   }
 
   retrieveUuid = async () => {
@@ -116,6 +131,7 @@ export default class App extends Component<Props> {
   }
 
   render() {
+    console.log("STATE NOW ", this.state);
     return (
       <View style={styles.container}>
         <Switch
