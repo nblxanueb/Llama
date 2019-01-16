@@ -3,10 +3,12 @@ import { Platform,
          StyleSheet,
          Text,
          View,
+         Button,
          Switch,
          AsyncStorage } from 'react-native';
 import io from 'socket.io-client';
-import { SOCKET_URL } from './config.js'
+import axios from 'axios';
+import { SOCKET_URL, BACKEND_URL } from './config.js'
 
 type Props = {};
 export default class App extends Component<Props> {
@@ -14,6 +16,7 @@ export default class App extends Component<Props> {
     super();
     this.state = {
       switchValue: false,
+      isSafe: true,
       socket: null,
       uuid: null,
       long: null,
@@ -34,6 +37,7 @@ export default class App extends Component<Props> {
   componentWillMount() {
     this.retrieveUuid();
     this.retrieveSwitchValue();
+    this.retrieveSafeStatus();
     this.setCurrentGeolocation();
   }
 
@@ -77,19 +81,23 @@ export default class App extends Component<Props> {
      }
   }
 
-  storeSwitchValue = async (value) => {
+  retrieveSafeStatus = async () => {
     try {
-      await AsyncStorage.setItem('switch', value);
-    } catch (error) {
-      console.log("SWITCH VALUE SAVE ERROR ", error);
-    }
+      const isSafe = await AsyncStorage.getItem('safe');
+      if (isSafe !== null) {
+        console.log("retrieved safe status: ", isSafe);
+        this.setState({ isSafe: JSON.parse(isSafe) })
+      }
+     } catch (error) {
+       console.log("SAFE STATUS RETRIEVE ERROR ", error);
+     }
   }
 
-  storeUuid = async (value) => {
+  store = async (key, value) => {
     try {
-      await AsyncStorage.setItem('uuid', value);
+      await AsyncStorage.setItem(key, value);
     } catch (error) {
-      console.log("SWITCH VALUE SAVE ERROR ", error);
+      console.log("Error storing on device", error);
     }
   }
 
@@ -101,11 +109,16 @@ export default class App extends Component<Props> {
         long: this.state.long,
         lat: this.state.lat,
       });
+    } else { // set user to active
+      socket && socket.emit('active', {
+        uuid: this.state.uuid,
+      });
     }
+
     socket.on('user_created', (user_object) => {
       console.log("Got user object: ", user_object);
       this.setState({ name: user_object.name, uuid: user_object.uuid });
-      this.storeUuid(user_object.uuid);
+      this.store('uuid', user_object.uuid);
     })
     socket.on('update', (arr) => {
       const llamas = arr;
@@ -114,20 +127,50 @@ export default class App extends Component<Props> {
     this.setState({ socket });
   }
 
+  postRequestToServer = (url, data) => {
+    axios.post(url, data)
+    .then((response) => {
+      console.log(response);
+    })
+    .catch((error) => {
+      console.log(error);
+    });
+  }
+
   toggleSwitch = (value) => {
     this.setState({switchValue: value});
     console.log('Switch is: ' + value);
     if (value == 1) {
       // active --> TODO start location tracking
       !this.state.socket && this.initSocket();
-      this.storeSwitchValue(JSON.stringify(true));
+      this.store('switch', JSON.stringify(true));
 
     } else {
       // not active --> TODO stop location tracking
+      this.state.socket && this.state.socket.emit('not_active', {
+        uuid: this.state.uuid
+      });
       this.state.socket && this.state.socket.disconnect();
       this.setState({ socket : null, llamas: [] });
-      this.storeSwitchValue(JSON.stringify(false));
+      this.store('switch', JSON.stringify(false));
     }
+  }
+
+  changeSafeStatus = () => {
+    const newStatus = !this.state.isSafe;
+    if (newStatus) {
+      this.postRequestToServer(`${BACKEND_URL}/user/imsafe`, {
+        uuid: this.state.uuid
+      });
+    } else {
+      this.postRequestToServer(`${BACKEND_URL}/user/notify`, {
+        uuid: this.state.uuid,
+        long: this.state.long,
+        lat: this.state.lat
+      });
+    }
+    this.store('safe', JSON.stringify(newStatus));
+    this.setState({ isSafe: newStatus });
   }
 
   render() {
@@ -142,6 +185,13 @@ export default class App extends Component<Props> {
           this.state.llamas &&
           this.state.llamas.map((item) => <Text key={item.uuid}>name: {item.name} long: {item.long} lat: {item.lat}</Text>)
         }
+        <Button
+          onPress={this.changeSafeStatus}
+          title={this.state.isSafe ? 'PLZ HELP' : 'IM SAFE'}
+          color="#841584"
+          accessibilityLabel="button to ask for help"
+        />
+        { this.state.error && (<Text>ERROR {this.state.error}</Text>)}
       </View>
     );
   }
