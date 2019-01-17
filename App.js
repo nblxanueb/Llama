@@ -26,7 +26,7 @@ export default class App extends Component<Props> {
       // sample llama (person in trouble) object
       // {
       //   uuid: 'fu3wfb-g34igub-v3rivf',
-      //   name: 'Lucy',
+      //   name: 'Lucy', ??? idk if necessary now
       //   long: 11,
       //   lat: 22,
       // }
@@ -127,13 +127,25 @@ export default class App extends Component<Props> {
       this.setState({ name: user_object.name, uuid: user_object.uuid });
       this.store('uuid', user_object.uuid);
     })
-    socket.on('update', (llama) => {
-      console.log("updating llama ", llama)
-      const llamas = this.state.llamas.slice(); // copy
+    socket.on('add_llama', (llama) => {
+      console.log("adding llama ", llama)
+      const llamas = [...this.state.llamas]; // copy
+      // const llamas = this.state.llamas.slice(); // copy
       llamas.push(llama);
       this.setState({ llamas });
     })
-    socket.on('new_room', () => {
+    socket.on('update_llama', (llama) => {
+      console.log("updating llama ", llama)
+      const llamaIndex = this.state.llamas.forEach((one,i) => {
+        if (one.uuid === llama.uuid) return i;
+      });
+      if (llamaIndex !== null) {
+        const llamas = [...this.state.llamas];
+        llamas.splice(llamaIndex, 1, llama);
+        this.setState({ llamas });
+      }
+    })
+    socket.on('new_llama', () => {
       socket.emit('active', {
         uuid: this.state.uuid,
         long: this.state.long,
