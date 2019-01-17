@@ -19,8 +19,8 @@ export default class App extends Component<Props> {
       isSafe: true,
       socket: null,
       uuid: null,
-      long: null,
-      lat: null,
+      long: 0,
+      lat: 0,
       name: null,
       error: null,
       // sample llama (person in trouble) object
@@ -43,10 +43,15 @@ export default class App extends Component<Props> {
 
   setCurrentGeolocation = () => {
     navigator.geolocation.getCurrentPosition((position) => {
-      this.setState({
-        lat: position.coords.latitude,
-        long: position.coords.longitude,
-        error: null,
+        this.setState({
+          lat: position.coords.latitude,
+          long: position.coords.longitude,
+          error: null,
+        });
+        this.state.socket && this.state.socket.emit('active', {
+          uuid: this.state.uuid,
+          long: this.state.long,
+          lat: this.state.lat,
         });
       },
       (error) => this.setState({ error: error.message }),
@@ -122,8 +127,10 @@ export default class App extends Component<Props> {
       this.setState({ name: user_object.name, uuid: user_object.uuid });
       this.store('uuid', user_object.uuid);
     })
-    socket.on('update', (arr) => {
-      const llamas = arr;
+    socket.on('update', (llama) => {
+      console.log("updating llama ", llama)
+      const llamas = this.state.llamas.slice(); // copy
+      llamas.push(llama);
       this.setState({ llamas });
     })
     socket.on('new_room', () => {
@@ -132,6 +139,10 @@ export default class App extends Component<Props> {
         long: this.state.long,
         lat: this.state.lat,
       });
+    })
+    socket.on('clear', (uuid) => {
+      const newLlamas = this.state.llamas.filter((item) => item.uuid !== uuid);
+      this.setState({ llamas: newLlamas });
     })
     this.setState({ socket });
   }
@@ -168,11 +179,11 @@ export default class App extends Component<Props> {
   changeSafeStatus = () => {
     const newStatus = !this.state.isSafe;
     if (newStatus) {
-      this.postRequestToServer(`${BACKEND_URL}/user/imsafe`, {
+      this.postRequestToServer(`${BACKEND_URL}user/imsafe`, {
         uuid: this.state.uuid
       });
     } else {
-      this.postRequestToServer(`${BACKEND_URL}/user/notify`, {
+      this.postRequestToServer(`${BACKEND_URL}user/notify`, {
         uuid: this.state.uuid,
         long: this.state.long,
         lat: this.state.lat
@@ -192,7 +203,7 @@ export default class App extends Component<Props> {
         />
         {
           this.state.llamas &&
-          this.state.llamas.map((item) => <Text key={item.uuid}>name: {item.name} long: {item.long} lat: {item.lat}</Text>)
+          this.state.llamas.map((item) => <Text key={item.uuid}>id: {item.uuid} long: {item.long} lat: {item.lat}</Text>)
         }
         <Button
           onPress={this.changeSafeStatus}
