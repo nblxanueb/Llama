@@ -119,6 +119,7 @@ export default class App extends Component<Props> {
 
   initSocket = () => {
     const socket = io(SOCKET_URL);
+    console.log("********** initiating socket *******");
     if (!this.state.uuid) {  // first time using the app
       socket && socket.emit('create_user', {
         device_token: `${Math.random()}`, // will be implemeted later
