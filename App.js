@@ -243,12 +243,12 @@ export default class App extends Component<Props> {
         <Text style={styles.red}>Llamas </Text>
         {
           this.state.llamas &&
-          this.state.llamas.map((item) => <Text style={styles.red} key={item.uuid}>id: {item.uuid} long: {item.long} lat: {item.lat}</Text>)
+          this.state.llamas.map((item) => <Text style={styles.red} key={item.uuid}>name: {item.name} id: {item.uuid} long: {item.long} lat: {item.lat}</Text>)
         }
         <Text style={styles.blue}>Responders </Text>
         {
           this.state.responders &&
-          this.state.responders.map((item) => <Text style={styles.blue} key={item.uuid}>id: {item.uuid} long: {item.long} lat: {item.lat}</Text>)
+          this.state.responders.map((item) => <Text style={styles.blue} key={item.uuid}>name: {item.name} id: {item.uuid} long: {item.long} lat: {item.lat}</Text>)
         }
         <Button
           onPress={this.changeSafeStatus}
