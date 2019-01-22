@@ -15,7 +15,7 @@ export default class App extends Component<Props> {
   constructor() {
     super();
     this.state = {
-      switchValue: false,
+      switchValue: true,
       isSafe: true,
       socket: null,
       uuid: null,
@@ -31,18 +31,26 @@ export default class App extends Component<Props> {
       //   lat: 22,
       // }
       llamas : [], // array of objects
+      responders: [], // responder objects
     }
   }
 
   componentWillMount() {
-    this.retrieveUuid();
-    this.retrieveSwitchValue();
-    this.retrieveSafeStatus();
-    this.setCurrentGeolocation();
+    this.retrieveSafeStatus()
+    .then(() => {
+       return this.setCurrentGeolocation();
+    })
+    .then(() => {
+       return this.retrieveUuid();
+    })
+    .then(() => {
+      this.retrieveSwitchValue();
+    })
+    .catch((err) => console.log(err));
   }
 
-  setCurrentGeolocation = () => {
-    navigator.geolocation.getCurrentPosition((position) => {
+  setCurrentGeolocation = async () => {
+    await navigator.geolocation.getCurrentPosition((position) => {
         this.setState({
           lat: position.coords.latitude,
           long: position.coords.longitude,
@@ -52,6 +60,7 @@ export default class App extends Component<Props> {
           uuid: this.state.uuid,
           long: this.state.long,
           lat: this.state.lat,
+          isSafe: this.state.isSafe,
         });
       },
       (error) => this.setState({ error: error.message }),
@@ -80,6 +89,8 @@ export default class App extends Component<Props> {
         if (!this.state.socket && switchValue == 'true') {
           this.initSocket();
         }
+      } else {
+        this.initSocket();
       }
      } catch (error) {
        console.log("SWITCH VALUE RETRIEVE ERROR ", error);
@@ -102,15 +113,16 @@ export default class App extends Component<Props> {
     try {
       await AsyncStorage.setItem(key, value);
     } catch (error) {
-      console.log("Error storing on device", error);
+      console.log(`Error storing ${key} on device`, error);
     }
   }
 
   initSocket = () => {
     const socket = io(SOCKET_URL);
+    console.log("********** initiating socket *******");
     if (!this.state.uuid) {  // first time using the app
       socket && socket.emit('create_user', {
-        device_token: '123', // will be implemeted later
+        device_token: `${Math.random()}`, // will be implemeted later
         long: this.state.long,
         lat: this.state.lat,
       });
@@ -119,6 +131,7 @@ export default class App extends Component<Props> {
         uuid: this.state.uuid,
         long: this.state.long,
         lat: this.state.lat,
+        isSafe: this.state.isSafe,
       });
     }
 
@@ -129,10 +142,15 @@ export default class App extends Component<Props> {
     })
     socket.on('add_llama', (llama) => {
       console.log("adding llama ", llama)
-      const llamas = [...this.state.llamas]; // copy
-      // const llamas = this.state.llamas.slice(); // copy
-      llamas.push(llama);
+      const llamas = [...this.state.llamas];
+      if (llama.uuid !== this.state.uuid)llamas.push(llama);
       this.setState({ llamas });
+    })
+    socket.on('add_responder', (resp) => {
+      console.log("adding reponder ", resp)
+      const responders = [...this.state.responders];
+      if (resp.uuid !== this.state.uuid) responders.push(resp);
+      this.setState({ responders });
     })
     socket.on('update_llama', (llama) => {
       console.log("updating llama ", llama)
@@ -145,28 +163,32 @@ export default class App extends Component<Props> {
         this.setState({ llamas });
       }
     })
+    socket.on('update_responder', (resp) => {
+      console.log("updating resonder ", resp)
+      const respIndex = this.state.responders.forEach((one,i) => {
+        if (one.uuid === resp.uuid) return i;
+      });
+      if (respIndex !== null) {
+        const responders = [...this.state.responders];
+        responders.splice(respIndex, 1, resp);
+        this.setState({ responders });
+      }
+    })
     socket.on('new_llama', () => {
       socket.emit('active', {
         uuid: this.state.uuid,
         long: this.state.long,
         lat: this.state.lat,
+        isSafe: this.state.isSafe,
       });
     })
     socket.on('clear', (uuid) => {
       const newLlamas = this.state.llamas.filter((item) => item.uuid !== uuid);
-      this.setState({ llamas: newLlamas });
+      const newResponders = this.state.responders.filter((item) => item.uuid !== uuid);
+      this.setState({ llamas: newLlamas, responders: newResponders });
     })
-    this.setState({ socket });
-  }
 
-  postRequestToServer = (url, data) => {
-    axios.post(url, data)
-    .then((response) => {
-      console.log(response);
-    })
-    .catch((error) => {
-      console.log(error);
-    });
+    this.setState({ socket });
   }
 
   toggleSwitch = (value) => {
@@ -191,15 +213,19 @@ export default class App extends Component<Props> {
   changeSafeStatus = () => {
     const newStatus = !this.state.isSafe;
     if (newStatus) {
-      this.postRequestToServer(`${BACKEND_URL}user/imsafe`, {
+      this.state.socket && this.state.socket.emit('imsafe', {
         uuid: this.state.uuid
       });
     } else {
-      this.postRequestToServer(`${BACKEND_URL}user/notify`, {
+      this.state.socket && this.state.socket.emit('notify', {
         uuid: this.state.uuid,
         long: this.state.long,
         lat: this.state.lat
       });
+      if(this.state.switchValue === false) { // if the user is not set active
+        this.store('switch', true);
+        this.setState({ switchValue: true });
+      }
     }
     this.store('safe', JSON.stringify(newStatus));
     this.setState({ isSafe: newStatus });
@@ -212,10 +238,17 @@ export default class App extends Component<Props> {
         <Switch
           onValueChange={this.toggleSwitch}
           value={this.state.switchValue}
+          disabled={this.state.isSafe ? false : true}
         />
+        <Text style={styles.red}>Llamas </Text>
         {
           this.state.llamas &&
-          this.state.llamas.map((item) => <Text key={item.uuid}>id: {item.uuid} long: {item.long} lat: {item.lat}</Text>)
+          this.state.llamas.map((item) => <Text style={styles.red} key={item.uuid}>id: {item.uuid} long: {item.long} lat: {item.lat}</Text>)
+        }
+        <Text style={styles.blue}>Responders </Text>
+        {
+          this.state.responders &&
+          this.state.responders.map((item) => <Text style={styles.blue} key={item.uuid}>id: {item.uuid} long: {item.long} lat: {item.lat}</Text>)
         }
         <Button
           onPress={this.changeSafeStatus}
@@ -246,4 +279,10 @@ const styles = StyleSheet.create({
     color: '#333333',
     marginBottom: 5,
   },
+  blue: {
+    color: '#0067f6',
+  },
+  red: {
+    color: '#ff2725',
+  }
 });
