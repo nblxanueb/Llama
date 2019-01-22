@@ -174,7 +174,7 @@ export default class App extends Component<Props> {
         this.setState({ responders });
       }
     })
-    socket.on('new_llama', () => {
+    socket.on('new_person', () => {
       socket.emit('active', {
         uuid: this.state.uuid,
         long: this.state.long,
