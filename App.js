@@ -174,13 +174,24 @@ export default class App extends Component<Props> {
         this.setState({ responders });
       }
     })
-    socket.on('new_person', () => {
+    socket.on('new_llama', () => {
       socket.emit('active', {
         uuid: this.state.uuid,
         long: this.state.long,
         lat: this.state.lat,
         isSafe: this.state.isSafe,
       });
+    })
+    socket.on('new_responder', () => {
+      console.log("new responder was hit");
+      if (!this.state.isSafe) {
+        socket.emit('active', {
+          uuid: this.state.uuid,
+          long: this.state.long,
+          lat: this.state.lat,
+          isSafe: this.state.isSafe,
+        });
+      }
     })
     socket.on('clear', (uuid) => {
       const newLlamas = this.state.llamas.filter((item) => item.uuid !== uuid);
