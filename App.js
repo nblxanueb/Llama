@@ -8,6 +8,9 @@ import { Platform,
          AsyncStorage } from 'react-native';
 import io from 'socket.io-client';
 import axios from 'axios';
+import DeviceInfo from 'react-native-device-info';
+import PushNotification from 'react-native-push-notification';
+import PushController from './PushController';
 import { SOCKET_URL, BACKEND_URL } from './config.js'
 
 type Props = {};
@@ -15,7 +18,7 @@ export default class App extends Component<Props> {
   constructor() {
     super();
     this.state = {
-      switchValue: true,
+      switchValue: false,
       isSafe: true,
       socket: null,
       uuid: null,
@@ -26,22 +29,29 @@ export default class App extends Component<Props> {
       // sample llama (person in trouble) object
       // {
       //   uuid: 'fu3wfb-g34igub-v3rivf',
-      //   name: 'Lucy', ??? idk if necessary now
+      //   name: 'Lucy',
       //   long: 11,
       //   lat: 22,
       // }
       llamas : [], // array of objects
       responders: [], // responder objects
+      device_token: null,
     }
   }
 
   componentWillMount() {
+    if (DeviceInfo.isEmulator()) {
+      console.log("==== its an emulator ======");
+    }
     this.retrieveSafeStatus()
     .then(() => {
        return this.setCurrentGeolocation();
     })
     .then(() => {
        return this.retrieveUuid();
+    })
+    .then(() => {
+       return this.retrieveDeviceToken();
     })
     .then(() => {
       this.retrieveSwitchValue();
@@ -89,9 +99,9 @@ export default class App extends Component<Props> {
         if (!this.state.socket && switchValue == 'true') {
           this.initSocket();
         }
-      } else {
-        this.initSocket();
-      }
+      }//  else {
+      //   this.initSocket();
+      // }
      } catch (error) {
        console.log("SWITCH VALUE RETRIEVE ERROR ", error);
      }
@@ -109,6 +119,27 @@ export default class App extends Component<Props> {
      }
   }
 
+  retrieveDeviceToken = async () => {
+    try {
+      const tkn = await AsyncStorage.getItem('token');
+      if (tkn !== null) {
+        console.log("retrieved device token: ", tkn);
+        this.setState({ device_token: tkn });
+      } else {
+        if (DeviceInfo.isEmulator()) {
+          console.log("created fake device token")
+          this.setState({ device_token: `${Math.random()}` });
+        }
+      }
+     } catch (error) {
+       console.log("DEVICE TOKEN RETRIEVE ERROR ", error);
+     }
+  }
+
+  setToken = (tkn) => {
+    this.setState({ device_token: tkn });
+  }
+
   store = async (key, value) => {
     try {
       await AsyncStorage.setItem(key, value);
@@ -122,7 +153,7 @@ export default class App extends Component<Props> {
     console.log("********** initiating socket *******");
     if (!this.state.uuid) {  // first time using the app
       socket && socket.emit('create_user', {
-        device_token: `${Math.random()}`, // will be implemeted later
+        device_token: this.state.device_token,
         long: this.state.long,
         lat: this.state.lat,
       });
@@ -134,6 +165,11 @@ export default class App extends Component<Props> {
         isSafe: this.state.isSafe,
       });
     }
+
+    socket.on('who_are_you', () => {
+      console.log('it me');
+      // this.setCurrentGeolocation();
+    })
 
     socket.on('user_created', (user_object) => {
       console.log("Got user object: ", user_object);
@@ -268,6 +304,7 @@ export default class App extends Component<Props> {
           accessibilityLabel="button to ask for help"
         />
         { this.state.error && (<Text>ERROR {this.state.error}</Text>)}
+        <PushController setToken={this.setToken}/>
       </View>
     );
   }
