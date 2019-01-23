@@ -3,7 +3,7 @@ import { PushNotificationIOS, Alert, AsyncStorage } from 'react-native';
 import PushNotification from 'react-native-push-notification';
 
 export default class PushController extends Component {
-  
+
   componentWillMount() {
     PushNotification.configure({
 
@@ -21,6 +21,7 @@ export default class PushController extends Component {
         // (required) Called when a remote or local notification is opened or received
          onNotification: function(notification) {
             console.log( 'NOTIFICATION:', notification );
+            notification.finish(PushNotificationIOS.FetchResult.NoData);
         },
 
         // IOS ONLY (optional): default: all - Permissions to register.
