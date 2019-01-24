@@ -26,12 +26,13 @@ export default class App extends Component<Props> {
       lat: 0,
       name: null,
       error: null,
-      // sample llama (person in trouble) object
+      // sample person object
       // {
       //   uuid: 'fu3wfb-g34igub-v3rivf',
       //   name: 'Lucy',
       //   long: 11,
       //   lat: 22,
+      //   ...
       // }
       llamas : [], // array of objects
       responders: [], // responder objects
@@ -55,16 +56,19 @@ export default class App extends Component<Props> {
        return this.retrieveDeviceToken();
     })
     .then(() => {
+       return this.retrieveName();
+    })
+    .then(() => {
       this.retrieveSwitchValue();
     })
-    .catch((err) => console.log(err));
+    .catch((err) => this.setState({ error: err.message }));
   }
 
   componentDidMount() {
     const watchId = setInterval(async () => {
       await navigator.geolocation.getCurrentPosition((position) => {
           console.log("******* updating location *************");
-          this.state.socket && this.state.socket.emit('update_location', {
+          this.state.socket && this.state.uuid && this.state.socket.emit('update_location', {
             uuid: this.state.uuid,
             lat: position.coords.latitude,
             long: position.coords.longitude,
@@ -80,29 +84,13 @@ export default class App extends Component<Props> {
         (error) => this.setState({ error: error.message }),
         { enableHighAccuracy: false, timeout: 20000, maximumAge: 1000 },
       );
-    }, 4500);
+    }, 5000);
     this.setState({ watchId });
   }
-  // componentDidMount() {
-  //   this.watchId = navigator.geolocation.watchPosition(
-  //     (position) => {
-  //       this.setState({
-  //         latitude: position.coords.latitude,
-  //         longitude: position.coords.longitude,
-  //         error: null,
-  //       });
-  //     },
-  //     (error) => this.setState({ error: error.message }),
-  //     { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000, distanceFilter: 10 },
-  //   );
-  // }
 
   componentWillUnmount() {
     clearInterval(this.state.watchId);
   }
-  // componentWillUnmount() {
-  //   navigator.geolocation.clearWatch(this.watchId);
-  // }
 
   setCurrentGeolocation = async () => {
     await navigator.geolocation.getCurrentPosition((position) => {
@@ -116,6 +104,7 @@ export default class App extends Component<Props> {
           long: this.state.long,
           lat: this.state.lat,
           isSafe: this.state.isSafe,
+          name: this.state.name,
         });
       },
       (error) => this.setState({ error: error.message }),
@@ -131,7 +120,21 @@ export default class App extends Component<Props> {
         this.setState({ uuid })
       }
      } catch (error) {
+       this.setState({ error: error.message })
        console.log("UUID RETRIEVE ERROR ", error);
+     }
+  }
+
+  retrieveName = async () => {
+    try {
+      const name = await AsyncStorage.getItem('name');
+      if (name !== null) {
+        console.log("retrieved name: ", name);
+        this.setState({ name })
+      }
+     } catch (error) {
+       this.setState({ error: error.message })
+       console.log("NAME RETRIEVE ERROR ", error);
      }
   }
 
@@ -144,10 +147,9 @@ export default class App extends Component<Props> {
         if (!this.state.socket && switchValue == 'true') {
           this.initSocket();
         }
-      }//  else {
-      //   this.initSocket();
-      // }
+      } // end outer if
      } catch (error) {
+       this.setState({ error: error.message })
        console.log("SWITCH VALUE RETRIEVE ERROR ", error);
      }
   }
@@ -160,6 +162,7 @@ export default class App extends Component<Props> {
         this.setState({ isSafe: JSON.parse(isSafe) })
       }
      } catch (error) {
+       this.setState({ error: error.message });
        console.log("SAFE STATUS RETRIEVE ERROR ", error);
      }
   }
@@ -177,6 +180,7 @@ export default class App extends Component<Props> {
         }
       }
      } catch (error) {
+       this.setState({ error: error.message });
        console.log("DEVICE TOKEN RETRIEVE ERROR ", error);
      }
   }
@@ -189,6 +193,7 @@ export default class App extends Component<Props> {
     try {
       await AsyncStorage.setItem(key, value);
     } catch (error) {
+      this.setState({ error: error.message })
       console.log(`Error storing ${key} on device`, error);
     }
   }
@@ -202,7 +207,7 @@ export default class App extends Component<Props> {
         long: this.state.long,
         lat: this.state.lat,
       });
-    } else { // set user to active
+    } else {
       socket && socket.emit('active', {
         uuid: this.state.uuid,
         long: this.state.long,
@@ -214,38 +219,42 @@ export default class App extends Component<Props> {
 
     socket.on('who_are_you', () => {
       console.log('it me');
-    })
+    });
 
     socket.on('user_created', (user_object) => {
       console.log("Got user object: ", user_object);
       this.setState({ name: user_object.name, uuid: user_object.uuid });
       this.store('uuid', user_object.uuid);
-    })
+      this.store('name', user_object.name);
+    });
+
     socket.on('add_llama', (llama) => {
       let llamaIndex = -1;
       this.state.llamas.forEach((one,i) => {
         if (one.uuid === llama.uuid) llamaIndex = i;
       });
-      if (llamaIndex === -1) {
+      if (llamaIndex === -1) { // not found
         console.log("adding llama ", llama)
         const llamas = [...this.state.llamas];
         if (llama.uuid !== this.state.uuid)llamas.push(llama);
         this.setState({ llamas });
       }
-    })
+    });
+
     socket.on('add_responder', (resp) => {
       let respIndex = -1;
       this.state.responders.forEach((one,i) => {
         if (one.uuid === resp.uuid) respIndex = i;
       });
       console.log(`add ${respIndex} resp ?`)
-      if(respIndex === -1) {
+      if(respIndex === -1) { // not found
         console.log("adding responder ", resp)
         const responders = [...this.state.responders];
         if (resp.uuid !== this.state.uuid) responders.push(resp);
         this.setState({ responders });
       }
-    })
+    });
+
     socket.on('update', (person) => {
       if (person.isSafe) {
         console.log("updating responder ", person);
@@ -253,25 +262,29 @@ export default class App extends Component<Props> {
         this.state.responders.forEach((one,i) => {
           if (one.uuid === person.uuid) respIndex = i;
         });
-        if (respIndex > -1) {
+        if (respIndex > -1) { // is found
           const responders = [...this.state.responders];
           responders.splice(respIndex, 1, person);
           this.setState({ responders });
         }
-      } else {
+      } else { // person is not safe
         console.log("updating llama ", person);
         let llamaIndex = -1;
         this.state.llamas.forEach((one,i) => {
           if (one.uuid === person.uuid) llamaIndex = i;
         });
-        if (llamaIndex < -1) {
+        if (llamaIndex > -1) { // is found
           const llamas = [...this.state.llamas];
           llamas.splice(llamaIndex, 1, person);
           this.setState({ llamas });
         }
       } // end else
-    })
-    socket.on('new_llama', () => {
+    });
+
+    socket.on('new_llama', (uuid) => {
+      // remove if new llama is in responder list
+      const responders = this.state.responders.filter((item) => item.uuid !== uuid);
+      this.setState({ responders });
       socket.emit('active', {
         uuid: this.state.uuid,
         long: this.state.long,
@@ -279,10 +292,11 @@ export default class App extends Component<Props> {
         isSafe: this.state.isSafe,
         name: this.state.name,
       });
-    })
+    });
+
     socket.on('new_responder', () => {
       console.log("new responder was hit");
-      if (!this.state.isSafe) {
+      if (!this.state.isSafe) { // responders will not get data about each other
         socket.emit('active', {
           uuid: this.state.uuid,
           long: this.state.long,
@@ -291,12 +305,13 @@ export default class App extends Component<Props> {
           name: this.state.name,
         });
       }
-    })
+    });
+
     socket.on('clear', (uuid) => {
       const newLlamas = this.state.llamas.filter((item) => item.uuid !== uuid);
       const newResponders = this.state.responders.filter((item) => item.uuid !== uuid);
       this.setState({ llamas: newLlamas, responders: newResponders });
-    })
+    });
 
     this.setState({ socket });
   }
@@ -330,7 +345,8 @@ export default class App extends Component<Props> {
       this.state.socket && this.state.socket.emit('notify', {
         uuid: this.state.uuid,
         long: this.state.long,
-        lat: this.state.lat
+        lat: this.state.lat,
+        name: this.state.name,
       });
       if(this.state.switchValue === false) { // if the user is not set active
         this.store('switch', true);
@@ -342,7 +358,7 @@ export default class App extends Component<Props> {
   }
 
   render() {
-    console.log("STATE NOW ", this.state.responders);
+    console.log("STATE NOW ", this.state);
     return (
       <View style={styles.container}>
         <Text>My Latitude: {this.state.lat}</Text>
