@@ -36,6 +36,7 @@ export default class App extends Component<Props> {
       llamas : [], // array of objects
       responders: [], // responder objects
       device_token: null,
+      watchId: 0,
     }
   }
 
@@ -58,6 +59,50 @@ export default class App extends Component<Props> {
     })
     .catch((err) => console.log(err));
   }
+
+  componentDidMount() {
+    const watchId = setInterval(async () => {
+      await navigator.geolocation.getCurrentPosition((position) => {
+          console.log("******* updating location *************");
+          this.state.socket && this.state.socket.emit('update_location', {
+            uuid: this.state.uuid,
+            lat: position.coords.latitude,
+            long: position.coords.longitude,
+            isSafe: this.state.isSafe,
+            name: this.state.name,
+          });
+          this.setState({
+            lat: position.coords.latitude,
+            long: position.coords.longitude,
+            error: null,
+          });
+        },
+        (error) => this.setState({ error: error.message }),
+        { enableHighAccuracy: false, timeout: 20000, maximumAge: 1000 },
+      );
+    }, 4500);
+    this.setState({ watchId });
+  }
+  // componentDidMount() {
+  //   this.watchId = navigator.geolocation.watchPosition(
+  //     (position) => {
+  //       this.setState({
+  //         latitude: position.coords.latitude,
+  //         longitude: position.coords.longitude,
+  //         error: null,
+  //       });
+  //     },
+  //     (error) => this.setState({ error: error.message }),
+  //     { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000, distanceFilter: 10 },
+  //   );
+  // }
+
+  componentWillUnmount() {
+    clearInterval(this.state.watchId);
+  }
+  // componentWillUnmount() {
+  //   navigator.geolocation.clearWatch(this.watchId);
+  // }
 
   setCurrentGeolocation = async () => {
     await navigator.geolocation.getCurrentPosition((position) => {
@@ -163,12 +208,12 @@ export default class App extends Component<Props> {
         long: this.state.long,
         lat: this.state.lat,
         isSafe: this.state.isSafe,
+        name: this.state.name,
       });
     }
 
     socket.on('who_are_you', () => {
       console.log('it me');
-      // this.setCurrentGeolocation();
     })
 
     socket.on('user_created', (user_object) => {
@@ -177,38 +222,54 @@ export default class App extends Component<Props> {
       this.store('uuid', user_object.uuid);
     })
     socket.on('add_llama', (llama) => {
-      console.log("adding llama ", llama)
-      const llamas = [...this.state.llamas];
-      if (llama.uuid !== this.state.uuid)llamas.push(llama);
-      this.setState({ llamas });
-    })
-    socket.on('add_responder', (resp) => {
-      console.log("adding reponder ", resp)
-      const responders = [...this.state.responders];
-      if (resp.uuid !== this.state.uuid) responders.push(resp);
-      this.setState({ responders });
-    })
-    socket.on('update_llama', (llama) => {
-      console.log("updating llama ", llama)
-      const llamaIndex = this.state.llamas.forEach((one,i) => {
-        if (one.uuid === llama.uuid) return i;
+      let llamaIndex = -1;
+      this.state.llamas.forEach((one,i) => {
+        if (one.uuid === llama.uuid) llamaIndex = i;
       });
-      if (llamaIndex !== null) {
+      if (llamaIndex === -1) {
+        console.log("adding llama ", llama)
         const llamas = [...this.state.llamas];
-        llamas.splice(llamaIndex, 1, llama);
+        if (llama.uuid !== this.state.uuid)llamas.push(llama);
         this.setState({ llamas });
       }
     })
-    socket.on('update_responder', (resp) => {
-      console.log("updating resonder ", resp)
-      const respIndex = this.state.responders.forEach((one,i) => {
-        if (one.uuid === resp.uuid) return i;
+    socket.on('add_responder', (resp) => {
+      let respIndex = -1;
+      this.state.responders.forEach((one,i) => {
+        if (one.uuid === resp.uuid) respIndex = i;
       });
-      if (respIndex !== null) {
+      console.log(`add ${respIndex} resp ?`)
+      if(respIndex === -1) {
+        console.log("adding responder ", resp)
         const responders = [...this.state.responders];
-        responders.splice(respIndex, 1, resp);
+        if (resp.uuid !== this.state.uuid) responders.push(resp);
         this.setState({ responders });
       }
+    })
+    socket.on('update', (person) => {
+      if (person.isSafe) {
+        console.log("updating responder ", person);
+        let respIndex = -1;
+        this.state.responders.forEach((one,i) => {
+          if (one.uuid === person.uuid) respIndex = i;
+        });
+        if (respIndex > -1) {
+          const responders = [...this.state.responders];
+          responders.splice(respIndex, 1, person);
+          this.setState({ responders });
+        }
+      } else {
+        console.log("updating llama ", person);
+        let llamaIndex = -1;
+        this.state.llamas.forEach((one,i) => {
+          if (one.uuid === person.uuid) llamaIndex = i;
+        });
+        if (llamaIndex < -1) {
+          const llamas = [...this.state.llamas];
+          llamas.splice(llamaIndex, 1, person);
+          this.setState({ llamas });
+        }
+      } // end else
     })
     socket.on('new_llama', () => {
       socket.emit('active', {
@@ -216,6 +277,7 @@ export default class App extends Component<Props> {
         long: this.state.long,
         lat: this.state.lat,
         isSafe: this.state.isSafe,
+        name: this.state.name,
       });
     })
     socket.on('new_responder', () => {
@@ -226,6 +288,7 @@ export default class App extends Component<Props> {
           long: this.state.long,
           lat: this.state.lat,
           isSafe: this.state.isSafe,
+          name: this.state.name,
         });
       }
     })
@@ -279,9 +342,11 @@ export default class App extends Component<Props> {
   }
 
   render() {
-    console.log("STATE NOW ", this.state);
+    console.log("STATE NOW ", this.state.responders);
     return (
       <View style={styles.container}>
+        <Text>My Latitude: {this.state.lat}</Text>
+        <Text>My Longitude: {this.state.long}</Text>
         <Switch
           onValueChange={this.toggleSwitch}
           value={this.state.switchValue}
