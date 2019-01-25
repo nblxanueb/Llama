@@ -5,13 +5,14 @@ import {
   Text,
   View,
   Button,
+  Image,
   Switch,
   TouchableOpacity,
   AsyncStorage
 } from "react-native";
 import io from "socket.io-client";
 import { SOCKET_URL, BACKEND_URL } from "./config.js";
-import MapView, { PROVIDER_GOOGLE, Marker } from "react-native-maps";
+import MapView, { PROVIDER_GOOGLE, Marker, Callout } from "react-native-maps";
 import { mapStyle } from "./mapstyles.js";
 import { styles } from "./styles.js";
 
@@ -256,65 +257,57 @@ export default class App extends Component<Props> {
 
   render() {
     console.log("STATE NOW ", this.state);
-    return (
-      <View style={styles.container}>
-        <MapView
-          provider={PROVIDER_GOOGLE}
-          style={ styles.map }
-          customMapStyle={mapStyle}
-          region={{
-            latitude: 40.756705,
-            longitude: -73.985251,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01
-          }}
-          showsUserLocation={true}
-        >
-        {this.state.llamas &&
-          this.state.llamas.map(llama => (
-            <Marker
-              title={llama.name}
-              coordinate={{ latitude: llama.lat, longitude: llama.long }}
-              image={require('./images/red.png')}
-            />
-          ))}
-        {this.state.responders &&
-          this.state.responders.map(responder => (
-            <Marker
-              title={responder.name}
-              coordinate={{
-                latitude: responder.lat,
-                longitude: responder.long
-              }}
-              image={require('./images/yellow.png')}
-            />
-          ))}
+    return <View style={styles.container}>
+        <MapView provider={PROVIDER_GOOGLE} style={styles.map} customMapStyle={mapStyle} region={{ latitude: 40.756705, longitude: -73.985251, latitudeDelta: 0.01, longitudeDelta: 0.01 }} showsUserLocation={true}>
+          {this.state.llamas && this.state.llamas.map(llama => (
+              <Marker
+                title={llama.name}
+                coordinate={{ latitude: llama.lat, longitude: llama.long }}
+                image={require("./images/red.png")}
+              >
+                <Callout>
+                  <Text style={{ textAlign: "center", marginBottom: 5 }}>
+                    {llama.name}
+                  </Text>
+                  <Image
+                    style={{ width: 180, height: 180 }}
+                    source={{ uri: `${BACKEND_URL}img/${llama.name}.jpeg` }}
+                  />
+                </Callout>
+              </Marker>
+            ))}
+          {this.state.responders && this.state.responders.map(responder => (
+              <Marker
+                title={responder.name}
+                coordinate={{
+                  latitude: responder.lat,
+                  longitude: responder.long
+                }}
+                image={require("./images/yellow.png")}>
+                <Callout>
+                  <Text style={{ textAlign: "center", marginBottom: 5 }}>
+                    {responder.name}
+                  </Text>
+                  <Image
+                    style={{ width: 180, height: 180 }}
+                    source={{ uri: `${BACKEND_URL}img/${responder.name}.jpeg` }}
+                  />
+                </Callout>
+              </Marker>
+            ))}
         </MapView>
         <View style={styles.header}>
           <Text style={styles.text}> I'm Ready to Help </Text>
-          <Switch
-            trackColor={{ true: "#31597a", false: "null"}}
-            style={styles.switch}
-            onValueChange={this.toggleSwitch}
-            value={this.state.switchValue}
-            disabled={this.state.isSafe ? false : true}
-          />
+          <Switch trackColor={{ true: "#31597a", false: "null" }} style={styles.switch} onValueChange={this.toggleSwitch} value={this.state.switchValue} disabled={this.state.isSafe ? false : true} />
         </View>
-        <View style={styles.filler}>
-        </View>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={this.changeSafeStatus}
-          accessibilityLabel="button to ask for help"
-        >
-        <Text style={styles.buttonText}>
-        {this.state.isSafe ? "Huddle Up" : "All Clear"}
-        </Text>
+        <View style={styles.filler} />
+        <TouchableOpacity style={styles.button} onPress={this.changeSafeStatus} accessibilityLabel="button to ask for help">
+          <Text style={styles.buttonText}>
+            {this.state.isSafe ? "Huddle Up" : "All Clear"}
+          </Text>
         </TouchableOpacity>
-        <View style={styles.filler2}>
-        </View>
-      </View>
-    );
+        <View style={styles.filler2} />
+      </View>;
   }
 }
 
