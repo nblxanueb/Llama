@@ -7,10 +7,10 @@ import { Platform,
          Switch,
          AsyncStorage } from 'react-native';
 import io from 'socket.io-client';
-import axios from 'axios';
 import DeviceInfo from 'react-native-device-info';
 import PushNotification from 'react-native-push-notification';
 import PushController from './PushController';
+import SplashScreen from 'react-native-splash-screen';
 import { SOCKET_URL, BACKEND_URL } from './config.js'
 
 type Props = {};
@@ -65,6 +65,7 @@ export default class App extends Component<Props> {
   }
 
   componentDidMount() {
+    SplashScreen.hide();
     const watchId = setInterval(async () => {
       await navigator.geolocation.getCurrentPosition((position) => {
           console.log("******* updating location *************");
