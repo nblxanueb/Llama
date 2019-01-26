@@ -1,17 +1,27 @@
-import React, {Component} from 'react';
-import { Platform,
-         StyleSheet,
-         Text,
-         View,
-         Button,
-         Switch,
-         AsyncStorage } from 'react-native';
-import io from 'socket.io-client';
+import React, { Component } from "react";
+import {
+  Platform,
+  StyleSheet,
+  Text,
+  View,
+  Button,
+  Image,
+  Switch,
+  TouchableOpacity,
+  AsyncStorage
+} from "react-native";
+import io from "socket.io-client";
+import { SOCKET_URL, BACKEND_URL } from "./config.js";
+import MapView, { PROVIDER_GOOGLE, Marker, Callout } from "react-native-maps";
+import { mapStyle } from "./mapstyles.js";
+import { styles } from "./styles.js";
 import DeviceInfo from 'react-native-device-info';
 import PushNotification from 'react-native-push-notification';
 import PushController from './PushController';
 import SplashScreen from 'react-native-splash-screen';
-import { SOCKET_URL, BACKEND_URL } from './config.js'
+
+console.disableYellowBox = true;
+
 
 type Props = {};
 export default class App extends Component<Props> {
@@ -26,14 +36,6 @@ export default class App extends Component<Props> {
       lat: 0,
       name: null,
       error: null,
-      // sample person object
-      // {
-      //   uuid: 'fu3wfb-g34igub-v3rivf',
-      //   name: 'Lucy',
-      //   long: 11,
-      //   lat: 22,
-      //   ...
-      // }
       llamas : [], // array of objects
       responders: [], // responder objects
       device_token: null,
@@ -94,31 +96,33 @@ export default class App extends Component<Props> {
   }
 
   setCurrentGeolocation = async () => {
-    await navigator.geolocation.getCurrentPosition((position) => {
+    await navigator.geolocation.getCurrentPosition(
+      position => {
         this.setState({
           lat: position.coords.latitude,
           long: position.coords.longitude,
-          error: null,
+          error: null
         });
-        this.state.socket && this.state.socket.emit('active', {
-          uuid: this.state.uuid,
-          long: this.state.long,
-          lat: this.state.lat,
-          isSafe: this.state.isSafe,
-          name: this.state.name,
-        });
+        this.state.socket &&
+          this.state.socket.emit("active", {
+            uuid: this.state.uuid,
+            long: this.state.long,
+            lat: this.state.lat,
+            isSafe: this.state.isSafe,
+            name: this.state.name,
+          });
       },
-      (error) => this.setState({ error: error.message }),
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 },
+      error => this.setState({ error: error.message }),
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 }
     );
-  }
+  };
 
   retrieveUuid = async () => {
     try {
-      const uuid = await AsyncStorage.getItem('uuid');
+      const uuid = await AsyncStorage.getItem("uuid");
       if (uuid !== null) {
         console.log("retrieved uuid: ", uuid);
-        this.setState({ uuid })
+        this.setState({ uuid });
       }
      } catch (error) {
        this.setState({ error: error.message })
@@ -141,11 +145,11 @@ export default class App extends Component<Props> {
 
   retrieveSwitchValue = async () => {
     try {
-      const switchValue = await AsyncStorage.getItem('switch');
+      const switchValue = await AsyncStorage.getItem("switch");
       if (switchValue !== null) {
         console.log("retrieved switch value: ", switchValue);
-        this.setState({ switchValue: JSON.parse(switchValue) })
-        if (!this.state.socket && switchValue == 'true') {
+        this.setState({ switchValue: JSON.parse(switchValue) });
+        if (!this.state.socket && switchValue == "true") {
           this.initSocket();
         }
       } // end outer if
@@ -157,10 +161,10 @@ export default class App extends Component<Props> {
 
   retrieveSafeStatus = async () => {
     try {
-      const isSafe = await AsyncStorage.getItem('safe');
+      const isSafe = await AsyncStorage.getItem("safe");
       if (isSafe !== null) {
         console.log("retrieved safe status: ", isSafe);
-        this.setState({ isSafe: JSON.parse(isSafe) })
+        this.setState({ isSafe: JSON.parse(isSafe) });
       }
      } catch (error) {
        this.setState({ error: error.message });
@@ -197,7 +201,7 @@ export default class App extends Component<Props> {
       this.setState({ error: error.message })
       console.log(`Error storing ${key} on device`, error);
     }
-  }
+  };
 
   initSocket = () => {
     const socket = io(SOCKET_URL);
@@ -315,33 +319,34 @@ export default class App extends Component<Props> {
     });
 
     this.setState({ socket });
-  }
+  };
 
-  toggleSwitch = (value) => {
-    this.setState({switchValue: value});
-    console.log('Switch is: ' + value);
+  toggleSwitch = value => {
+    this.setState({ switchValue: value });
+    console.log("Switch is: " + value);
     if (value == 1) {
       // active --> TODO start location tracking
       !this.state.socket && this.initSocket();
-      this.store('switch', JSON.stringify(true));
-
+      this.store("switch", JSON.stringify(true));
     } else {
       // not active --> TODO stop location tracking
-      this.state.socket && this.state.socket.emit('not_active', {
-        uuid: this.state.uuid
-      });
+      this.state.socket &&
+        this.state.socket.emit("not_active", {
+          uuid: this.state.uuid
+        });
       this.state.socket && this.state.socket.disconnect();
-      this.setState({ socket : null, llamas: [] });
-      this.store('switch', JSON.stringify(false));
+      this.setState({ socket: null, llamas: [] });
+      this.store("switch", JSON.stringify(false));
     }
-  }
+  };
 
   changeSafeStatus = () => {
     const newStatus = !this.state.isSafe;
     if (newStatus) {
-      this.state.socket && this.state.socket.emit('imsafe', {
-        uuid: this.state.uuid
-      });
+      this.state.socket &&
+        this.state.socket.emit("imsafe", {
+          uuid: this.state.uuid
+        });
     } else {
       this.state.socket && this.state.socket.emit('notify', {
         uuid: this.state.uuid,
@@ -354,65 +359,65 @@ export default class App extends Component<Props> {
         this.setState({ switchValue: true });
       }
     }
-    this.store('safe', JSON.stringify(newStatus));
+    this.store("safe", JSON.stringify(newStatus));
     this.setState({ isSafe: newStatus });
-  }
+  };
 
   render() {
     console.log("STATE NOW ", this.state);
-    return (
-      <View style={styles.container}>
-        <Text>My Latitude: {this.state.lat}</Text>
-        <Text>My Longitude: {this.state.long}</Text>
-        <Switch
-          onValueChange={this.toggleSwitch}
-          value={this.state.switchValue}
-          disabled={this.state.isSafe ? false : true}
-        />
-        <Text style={styles.red}>Llamas </Text>
-        {
-          this.state.llamas &&
-          this.state.llamas.map((item) => <Text style={styles.red} key={item.uuid}>name: {item.name} id: {item.uuid} long: {item.long} lat: {item.lat}</Text>)
-        }
-        <Text style={styles.blue}>Responders </Text>
-        {
-          this.state.responders &&
-          this.state.responders.map((item) => <Text style={styles.blue} key={item.uuid}>name: {item.name} id: {item.uuid} long: {item.long} lat: {item.lat}</Text>)
-        }
-        <Button
-          onPress={this.changeSafeStatus}
-          title={this.state.isSafe ? 'PLZ HELP' : 'IM SAFE'}
-          color="#841584"
-          accessibilityLabel="button to ask for help"
-        />
-        { this.state.error && (<Text>ERROR {this.state.error}</Text>)}
+
+    return <View style={styles.container}>
+        <MapView provider={PROVIDER_GOOGLE} style={styles.map} customMapStyle={mapStyle} region={{ latitude: 40.756705, longitude: -73.985251, latitudeDelta: 0.01, longitudeDelta: 0.01 }} showsUserLocation={true}>
+          {this.state.llamas && this.state.llamas.map(llama => (
+              <Marker
+                title={llama.name}
+                coordinate={{ latitude: llama.lat, longitude: llama.long }}
+                image={require("./images/red.png")}
+              >
+                <Callout>
+                  <Text style={{ textAlign: "center", marginBottom: 5 }}>
+                    {llama.name}
+                  </Text>
+                  <Image
+                    style={{ width: 180, height: 180 }}
+                    source={{ uri: `${BACKEND_URL}img/${llama.name}.jpeg` }}
+                  />
+                </Callout>
+              </Marker>
+            ))}
+          {this.state.responders && this.state.responders.map(responder => (
+              <Marker
+                title={responder.name}
+                coordinate={{
+                  latitude: responder.lat,
+                  longitude: responder.long
+                }}
+                image={require("./images/yellow.png")}>
+                <Callout>
+                  <Text style={{ textAlign: "center", marginBottom: 5 }}>
+                    {responder.name}
+                  </Text>
+                  <Image
+                    style={{ width: 180, height: 180 }}
+                    source={{ uri: `${BACKEND_URL}img/${responder.name}.jpeg` }}
+                  />
+                </Callout>
+              </Marker>
+            ))}
+        </MapView>
+        <View style={styles.header}>
+          <Text style={styles.text}> I'm Ready to Help </Text>
+          <Switch trackColor={{ true: "#31597a", false: "null" }} style={styles.switch} onValueChange={this.toggleSwitch} value={this.state.switchValue} disabled={this.state.isSafe ? false : true} />
+        </View>
+        <View style={styles.filler} />
+        <TouchableOpacity style={styles.button} onPress={this.changeSafeStatus} accessibilityLabel="button to ask for help">
+          <Text style={styles.buttonText}>
+            {this.state.isSafe ? "Huddle Up" : "All Clear"}
+          </Text>
+        </TouchableOpacity>
+        <View style={styles.filler2} />
         <PushController setToken={this.setToken}/>
-      </View>
-    );
+      </View>;
   }
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5FCFF',
-  },
-  welcome: {
-    fontSize: 20,
-    textAlign: 'center',
-    margin: 10,
-  },
-  instructions: {
-    textAlign: 'center',
-    color: '#333333',
-    marginBottom: 5,
-  },
-  blue: {
-    color: '#0067f6',
-  },
-  red: {
-    color: '#ff2725',
-  }
-});
