@@ -11,12 +11,14 @@
 #import <React/RCTRootView.h>
 #import <React/RCTPushNotificationManager.h>
 #import "RNSplashScreen.h"
+@import GoogleMaps;
 
 @implementation AppDelegate
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
   NSURL *jsCodeLocation;
+  [GMSServices provideAPIKey:@"AIzaSyCeTdCRweKINV2rVaMeM8LSSFMewLhUAXI"];
 
   #ifdef DEBUG
     jsCodeLocation = [[RCTBundleURLProvider sharedSettings] jsBundleURLForBundleRoot:@"index" fallbackResource:nil];

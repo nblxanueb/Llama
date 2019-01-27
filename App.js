@@ -1,17 +1,27 @@
 import React, {Component} from 'react';
-import { Platform,
-         StyleSheet,
-         Text,
-         View,
-         Button,
-         Switch,
-         AsyncStorage } from 'react-native';
+import {
+  Platform,
+  StyleSheet,
+  Text,
+  View,
+  Button,
+  Image,
+  Switch,
+  TouchableOpacity,
+  AsyncStorage
+} from "react-native";
 import io from 'socket.io-client';
 import DeviceInfo from 'react-native-device-info';
 import PushNotification from 'react-native-push-notification';
 import PushController from './PushController';
 import SplashScreen from 'react-native-splash-screen';
-import { SOCKET_URL, BACKEND_URL } from './config.js'
+import { SOCKET_URL, BACKEND_URL } from './config.js';
+import MapView, { PROVIDER_GOOGLE, Marker, Callout } from 'react-native-maps';
+import { mapStyle } from "./mapstyles.js";
+import { styles } from "./styles.js";
+
+console.disableYellowBox = true;
+
 
 type Props = {};
 export default class App extends Component<Props> {
@@ -26,14 +36,6 @@ export default class App extends Component<Props> {
       lat: 0,
       name: null,
       error: null,
-      // sample person object
-      // {
-      //   uuid: 'fu3wfb-g34igub-v3rivf',
-      //   name: 'Lucy',
-      //   long: 11,
-      //   lat: 22,
-      //   ...
-      // }
       llamas : [], // array of objects
       responders: [], // responder objects
       device_token: null,
@@ -362,57 +364,66 @@ export default class App extends Component<Props> {
     console.log("STATE NOW ", this.state);
     return (
       <View style={styles.container}>
-        <Text>My Latitude: {this.state.lat}</Text>
-        <Text>My Longitude: {this.state.long}</Text>
-        <Switch
-          onValueChange={this.toggleSwitch}
-          value={this.state.switchValue}
-          disabled={this.state.isSafe ? false : true}
-        />
-        <Text style={styles.red}>Llamas </Text>
-        {
-          this.state.llamas &&
-          this.state.llamas.map((item) => <Text style={styles.red} key={item.uuid}>name: {item.name} id: {item.uuid} long: {item.long} lat: {item.lat}</Text>)
-        }
-        <Text style={styles.blue}>Responders </Text>
-        {
-          this.state.responders &&
-          this.state.responders.map((item) => <Text style={styles.blue} key={item.uuid}>name: {item.name} id: {item.uuid} long: {item.long} lat: {item.lat}</Text>)
-        }
-        <Button
-          onPress={this.changeSafeStatus}
-          title={this.state.isSafe ? 'PLZ HELP' : 'IM SAFE'}
-          color="#841584"
-          accessibilityLabel="button to ask for help"
-        />
-        { this.state.error && (<Text>ERROR {this.state.error}</Text>)}
+        <MapView
+          provider={PROVIDER_GOOGLE}
+          style={styles.map}
+          customMapStyle={mapStyle}
+          region={{
+            latitude: this.state.lat,
+            longitude: this.state.long,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.015 }}
+            showsUserLocation={true}>
+          {this.state.llamas && this.state.llamas.map(llama => (
+              <Marker
+                title={llama.name}
+                coordinate={{ latitude: llama.lat, longitude: llama.long }}
+                image={require("./images/red.png")}
+              >
+                <Callout>
+                  <Text style={{ textAlign: "center", marginBottom: 5 }}>
+                    {llama.name}
+                  </Text>
+                  <Image
+                    style={{ width: 180, height: 180 }}
+                    source={{ uri: `${BACKEND_URL}img/${llama.name}.jpeg` }}
+                  />
+                </Callout>
+              </Marker>
+            ))}
+          {this.state.responders && this.state.responders.map(responder => (
+              <Marker
+                title={responder.name}
+                coordinate={{
+                  latitude: responder.lat,
+                  longitude: responder.long
+                }}
+                image={require("./images/yellow.png")}>
+                <Callout>
+                  <Text style={{ textAlign: "center", marginBottom: 5 }}>
+                    {responder.name}
+                  </Text>
+                  <Image
+                    style={{ width: 180, height: 180 }}
+                    source={{ uri: `${BACKEND_URL}img/${responder.name}.jpeg` }}
+                  />
+                </Callout>
+              </Marker>
+            ))}
+        </MapView>
+        <View style={styles.header}>
+          <Text style={styles.text}> I'm Ready to Help </Text>
+          <Switch trackColor={{ true: "#31597a", false: "null" }} style={styles.switch} onValueChange={this.toggleSwitch} value={this.state.switchValue} disabled={this.state.isSafe ? false : true} />
+        </View>
+        <View style={styles.filler} />
+        <TouchableOpacity style={styles.button} onPress={this.changeSafeStatus} accessibilityLabel="button to ask for help">
+          <Text style={styles.buttonText}>
+            {this.state.isSafe ? "Huddle Up" : "All Clear"}
+          </Text>
+        </TouchableOpacity>
+        <View style={styles.filler2} />
         <PushController setToken={this.setToken}/>
       </View>
     );
   }
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5FCFF',
-  },
-  welcome: {
-    fontSize: 20,
-    textAlign: 'center',
-    margin: 10,
-  },
-  instructions: {
-    textAlign: 'center',
-    color: '#333333',
-    marginBottom: 5,
-  },
-  blue: {
-    color: '#0067f6',
-  },
-  red: {
-    color: '#ff2725',
-  }
-});
