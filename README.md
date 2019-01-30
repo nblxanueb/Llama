@@ -1,6 +1,7 @@
 ![Llama](pix4readme/banner.png)
 ===
 ## React Native app for gender equality in public
+For GenHack Hackathon NYC, January 2019
 * #### location based
 * #### notifies allies if someone is unsafe
 * #### tracks location of allies, so unsafe person will know where to go
